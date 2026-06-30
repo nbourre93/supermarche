@@ -10,6 +10,7 @@
 <title>🛒 Mon Supermarché</title>
 <link rel="manifest" href="manifest.json">
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -315,29 +316,51 @@ const PRODUITS={
   "2000000000503":{nom:"Lessive",cat:"Maison",prix:5.20,emoji:"🫧"}
 };
 
-let panier=[],total=0,scanning=false,scannerStream=null,barcodeDetector=null,animationId=null,audioCtx=null,argentDonne=0;
+let panier=[],total=0,scanning=false,scannerStream=null,zxingReader=null,audioCtx=null,argentDonne=0;
 
 async function toggleScan(){scanning?arreterScan():await demarrerScan();}
 
 async function demarrerScan(){
   if(!audioCtx){try{audioCtx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}
   const fb=document.getElementById('feedback');
-  if(!('BarcodeDetector' in window)){
-    const c=prompt("📦 Entre le numéro du code barre :");
-    if(c&&c.trim())traiterCode(c.trim());return;
+
+  if(typeof ZXing==='undefined'){
+    fb.className='error';fb.textContent='❌ Scanner indisponible — saisis le code manuellement';
+    setTimeout(()=>{const c=prompt("📦 Numéro du code barre :");if(c&&c.trim())traiterCode(c.trim());},400);
+    return;
   }
+
   try{
     const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280}}});
     scannerStream=stream;
     const v=document.getElementById('video');v.srcObject=stream;await v.play();
-    barcodeDetector=new BarcodeDetector({formats:['ean_13','ean_8','code_128','upc_a','upc_e','code_39']});
+
     scanning=true;
     document.getElementById('video-wrapper').classList.add('active');
     document.getElementById('btn-scan').classList.add('scanning');
     document.getElementById('btn-scan-icon').textContent='⏹️';
     document.getElementById('btn-scan-label').textContent='Arrêter le scan';
     fb.className='';fb.textContent='📷 Approche le code barre…';
-    detectLoop();
+
+    const hints=new Map();
+    const formats=[
+      ZXing.BarcodeFormat.EAN_13,
+      ZXing.BarcodeFormat.EAN_8,
+      ZXing.BarcodeFormat.CODE_128,
+      ZXing.BarcodeFormat.UPC_A,
+      ZXing.BarcodeFormat.UPC_E,
+      ZXing.BarcodeFormat.CODE_39
+    ];
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,formats);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
+    zxingReader=new ZXing.BrowserMultiFormatReader(hints);
+
+    zxingReader.decodeFromVideoElement(v,(result,err)=>{
+      if(result&&scanning){
+        traiterCode(result.getText());
+        arreterScan();
+      }
+    });
   }catch(e){
     fb.className='error';fb.textContent='❌ Caméra indispo — saisis le code manuellement';
     setTimeout(()=>{const c=prompt("📦 Numéro du code barre :");if(c&&c.trim())traiterCode(c.trim());},400);
@@ -345,20 +368,14 @@ async function demarrerScan(){
 }
 
 function arreterScan(){
-  scanning=false;if(animationId)cancelAnimationFrame(animationId);
+  scanning=false;
+  if(zxingReader){try{zxingReader.reset();}catch(e){}zxingReader=null;}
   if(scannerStream){scannerStream.getTracks().forEach(t=>t.stop());scannerStream=null;}
-  document.getElementById('video').srcObject=null;
+  const v=document.getElementById('video');if(v)v.srcObject=null;
   document.getElementById('video-wrapper').classList.remove('active');
   document.getElementById('btn-scan').classList.remove('scanning');
   document.getElementById('btn-scan-icon').textContent='📷';
   document.getElementById('btn-scan-label').textContent='Scanner un produit';
-}
-
-async function detectLoop(){
-  if(!scanning)return;
-  const v=document.getElementById('video');
-  if(v.readyState>=2){try{const c=await barcodeDetector.detect(v);if(c.length>0){traiterCode(c[0].rawValue);arreterScan();return;}}catch(e){}}
-  animationId=requestAnimationFrame(detectLoop);
 }
 
 function traiterCode(code){
