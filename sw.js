@@ -1,4 +1,4 @@
-const CACHE = 'supermarche-v1';
+const CACHE = 'supermarche-v2';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
