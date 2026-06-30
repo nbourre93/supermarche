@@ -70,6 +70,7 @@ html,body{height:100%;font-family:'Nunito',sans-serif;background:var(--bg);color
 #btn-scan{background:var(--green);color:white;border:none;border-radius:20px;padding:16px;font-family:'Nunito',sans-serif;font-size:21px;font-weight:900;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 6px 0 var(--green-dark);transition:transform .1s,box-shadow .1s;-webkit-tap-highlight-color:transparent}
 #btn-scan:active{transform:translateY(4px);box-shadow:0 2px 0 var(--green-dark)}
 #btn-scan.scanning{background:var(--red);box-shadow:0 6px 0 var(--red-dark)}
+#btn-saisie-manuelle{background:none;border:none;color:var(--text-light);font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;text-decoration:underline;cursor:pointer;padding:4px;text-align:center;-webkit-tap-highlight-color:transparent}
 #actions-row{display:flex;gap:8px}
 .btn-secondary{flex:1;border:3px solid var(--green);background:white;color:var(--green);border-radius:14px;padding:11px 6px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;cursor:pointer;text-align:center;-webkit-tap-highlight-color:transparent}
 #btn-payer-open{border-color:#D97B10;color:#D97B10}
@@ -183,6 +184,7 @@ html,body{height:100%;font-family:'Nunito',sans-serif;background:var(--bg);color
       <span id="btn-scan-icon">📷</span>
       <span id="btn-scan-label">Scanner un produit</span>
     </button>
+    <button id="btn-saisie-manuelle" onclick="saisieManuelle()" style="display:none">⌨️ Le code ne passe pas ? Tape-le ici</button>
     <div id="actions-row">
       <button class="btn-secondary" id="btn-vider" onclick="viderPanier()">🗑️ Vider</button>
       <button class="btn-secondary" id="btn-payer-open" onclick="ouvrirPayer()">💰 Payer</button>
@@ -316,31 +318,29 @@ const PRODUITS={
   "2000000000503":{nom:"Lessive",cat:"Maison",prix:5.20,emoji:"🫧"}
 };
 
-let panier=[],total=0,scanning=false,scannerStream=null,zxingReader=null,audioCtx=null,argentDonne=0;
+let panier=[],total=0,scanning=false,scannerStream=null,zxingReader=null,audioCtx=null,argentDonne=0,scanTimeoutId=null;
 
 async function toggleScan(){scanning?arreterScan():await demarrerScan();}
 
 async function demarrerScan(){
   if(!audioCtx){try{audioCtx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}
   const fb=document.getElementById('feedback');
+  const btnManuel=document.getElementById('btn-saisie-manuelle');
 
   if(typeof ZXing==='undefined'){
     fb.className='error';fb.textContent='❌ Scanner indisponible — saisis le code manuellement';
-    setTimeout(()=>{const c=prompt("📦 Numéro du code barre :");if(c&&c.trim())traiterCode(c.trim());},400);
+    saisieManuelle();
     return;
   }
 
   try{
-    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280}}});
-    scannerStream=stream;
-    const v=document.getElementById('video');v.srcObject=stream;await v.play();
-
     scanning=true;
     document.getElementById('video-wrapper').classList.add('active');
     document.getElementById('btn-scan').classList.add('scanning');
     document.getElementById('btn-scan-icon').textContent='⏹️';
     document.getElementById('btn-scan-label').textContent='Arrêter le scan';
     fb.className='';fb.textContent='📷 Approche le code barre…';
+    btnManuel.style.display='block';
 
     const hints=new Map();
     const formats=[
@@ -354,28 +354,79 @@ async function demarrerScan(){
     hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,formats);
     hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
     zxingReader=new ZXing.BrowserMultiFormatReader(hints);
+    zxingReader.timeBetweenDecodingAttempts=80;
 
-    zxingReader.decodeFromVideoElement(v,(result,err)=>{
-      if(result&&scanning){
-        traiterCode(result.getText());
-        arreterScan();
+    const v=document.getElementById('video');
+
+    const constraints={
+      video:{
+        facingMode:{ideal:'environment'},
+        width:{ideal:1920},
+        height:{ideal:1080},
+        advanced:[{focusMode:'continuous'}]
       }
-    });
+    };
+
+    const devices=await ZXing.BrowserCodeReader.listVideoInputDevices().catch(()=>[]);
+    let deviceId=undefined;
+    if(devices&&devices.length){
+      const back=devices.find(d=>/back|rear|environment/i.test(d.label));
+      deviceId=(back||devices[devices.length-1]).deviceId;
+    }
+
+    await zxingReader.decodeFromConstraints(
+      deviceId?{video:{deviceId:{exact:deviceId},width:{ideal:1920},height:{ideal:1080}}}:constraints,
+      v,
+      (result,err,controls)=>{
+        if(result&&scanning){
+          traiterCode(result.getText());
+          arreterScan();
+        }
+      }
+    );
+
+    scannerStream=v.srcObject;
+
+    if(scanTimeoutId)clearTimeout(scanTimeoutId);
+    scanTimeoutId=setTimeout(()=>{
+      if(scanning){
+        fb.className='';
+        fb.textContent='🔍 Toujours rien ? Essaie de rapprocher / éloigner le code';
+      }
+    },6000);
+
   }catch(e){
-    fb.className='error';fb.textContent='❌ Caméra indispo — saisis le code manuellement';
-    setTimeout(()=>{const c=prompt("📦 Numéro du code barre :");if(c&&c.trim())traiterCode(c.trim());},400);
+    console.error(e);
+    scanning=false;
+    document.getElementById('video-wrapper').classList.remove('active');
+    document.getElementById('btn-scan').classList.remove('scanning');
+    document.getElementById('btn-scan-icon').textContent='📷';
+    document.getElementById('btn-scan-label').textContent='Scanner un produit';
+    fb.className='error';fb.textContent='❌ Caméra indisponible — saisis le code manuellement';
+    saisieManuelle();
   }
 }
 
 function arreterScan(){
   scanning=false;
+  if(scanTimeoutId){clearTimeout(scanTimeoutId);scanTimeoutId=null;}
   if(zxingReader){try{zxingReader.reset();}catch(e){}zxingReader=null;}
-  if(scannerStream){scannerStream.getTracks().forEach(t=>t.stop());scannerStream=null;}
+  if(scannerStream){try{scannerStream.getTracks().forEach(t=>t.stop());}catch(e){}scannerStream=null;}
   const v=document.getElementById('video');if(v)v.srcObject=null;
   document.getElementById('video-wrapper').classList.remove('active');
   document.getElementById('btn-scan').classList.remove('scanning');
   document.getElementById('btn-scan-icon').textContent='📷';
   document.getElementById('btn-scan-label').textContent='Scanner un produit';
+  document.getElementById('btn-saisie-manuelle').style.display='none';
+}
+
+function saisieManuelle(){
+  const wasScanning=scanning;
+  if(wasScanning)arreterScan();
+  setTimeout(()=>{
+    const c=prompt("📦 Tape le numéro du code barre (13 chiffres) :");
+    if(c&&c.trim())traiterCode(c.trim());
+  },wasScanning?300:0);
 }
 
 function traiterCode(code){
