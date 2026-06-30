@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Mon Supermarché">
+<meta name="theme-color" content="#2D8A4E">
+<title>🛒 Mon Supermarché</title>
+<link rel="manifest" href="manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --green:#2D8A4E;--green-dark:#1F6438;
+  --yellow:#FFD23F;--yellow-dark:#E6B800;
+  --red:#E83B2A;--red-dark:#A82920;
+  --bg:#FAFAF7;--white:#FFF;
+  --text:#1A1A1A;--text-light:#6B7280;
+  --belt-a:#C0392B;--belt-b:#E74C3C;
+}
+html,body{height:100%;font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
+#app{display:flex;flex-direction:column;height:100dvh;max-width:480px;margin:0 auto}
+#install-banner{display:none;background:var(--green);color:white;padding:10px 16px;font-size:13px;font-weight:700;flex-shrink:0;gap:10px;align-items:center;justify-content:space-between}
+#install-banner.show{display:flex}
+#install-banner button{background:var(--yellow);color:var(--text);border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:900;cursor:pointer}
+#install-banner .close-btn{background:rgba(255,255,255,.2);color:white}
+#header{background:var(--green);color:white;padding:10px 16px 8px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;box-shadow:0 3px 12px rgba(45,138,78,.35);z-index:10}
+#header h1{font-size:19px;font-weight:900}
+#header h1 span{font-size:22px}
+#total-header{background:var(--yellow);color:var(--text);border-radius:12px;padding:4px 12px;font-family:'Space Mono',monospace;font-size:17px;font-weight:700;min-width:80px;text-align:right;transition:transform .15s,background .15s}
+#total-header.bump{transform:scale(1.15);background:var(--yellow-dark)}
+#panier-container{flex:1;overflow-y:auto;padding:10px 12px 6px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch}
+#panier-container::-webkit-scrollbar{width:4px}
+#panier-container::-webkit-scrollbar-thumb{background:#D1D5DB;border-radius:4px}
+#tapis{background:repeating-linear-gradient(90deg,var(--belt-a) 0,var(--belt-a) 18px,var(--belt-b) 18px,var(--belt-b) 36px,var(--belt-a) 36px,var(--belt-a) 54px,var(--belt-b) 54px,var(--belt-b) 72px);height:13px;flex-shrink:0;border-top:3px solid #922B21;border-bottom:3px solid #922B21;background-size:72px 100%;animation:belt 1.5s linear infinite;opacity:.85}
+@keyframes belt{from{background-position:0 0}to{background-position:72px 0}}
+.produit-card{background:var(--white);border-radius:16px;padding:11px 13px;display:flex;align-items:center;gap:11px;box-shadow:0 2px 10px rgba(0,0,0,.08);animation:slide-in .3s cubic-bezier(.34,1.56,.64,1);border-left:5px solid var(--green)}
+.produit-card.nouveau{border-left-color:var(--yellow-dark)}
+@keyframes slide-in{from{transform:translateX(-30px) scale(.9);opacity:0}to{transform:translateX(0) scale(1);opacity:1}}
+.produit-emoji{font-size:34px;flex-shrink:0;width:42px;text-align:center}
+.produit-info{flex:1;min-width:0}
+.produit-nom{font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.produit-cat{font-size:11px;color:var(--text-light);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-top:1px}
+.produit-prix{font-family:'Space Mono',monospace;font-size:17px;font-weight:700;color:var(--green-dark);flex-shrink:0}
+.btn-retirer{background:none;border:none;font-size:20px;cursor:pointer;padding:4px;border-radius:8px;flex-shrink:0}
+#empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 20px;color:var(--text-light);text-align:center;gap:10px;flex:1}
+#empty-state .big-icon{font-size:68px;animation:float 3s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+#empty-state p{font-size:17px;font-weight:700;color:var(--text)}
+#empty-state small{font-size:13px;font-weight:600}
+#scan-zone{flex-shrink:0;padding:9px 12px;background:white;border-top:2px solid #E5E7EB;display:flex;flex-direction:column;gap:7px}
+#video-wrapper{position:relative;width:100%;border-radius:16px;overflow:hidden;background:#000;aspect-ratio:3/2;display:none}
+#video-wrapper.active{display:block}
+#video{width:100%;height:100%;object-fit:cover;display:block}
+#viewfinder{position:absolute;inset:0;pointer-events:none}
+.vf-corner{position:absolute;width:28px;height:28px;border-color:var(--yellow);border-style:solid;border-width:0}
+.vf-corner.tl{top:16px;left:16px;border-top-width:4px;border-left-width:4px;border-radius:4px 0 0 0}
+.vf-corner.tr{top:16px;right:16px;border-top-width:4px;border-right-width:4px;border-radius:0 4px 0 0}
+.vf-corner.bl{bottom:16px;left:16px;border-bottom-width:4px;border-left-width:4px;border-radius:0 0 0 4px}
+.vf-corner.br{bottom:16px;right:16px;border-bottom-width:4px;border-right-width:4px;border-radius:0 0 4px 0}
+.vf-line{position:absolute;left:20px;right:20px;height:3px;background:linear-gradient(90deg,transparent,var(--yellow),transparent);top:50%;animation:scan-line 2s ease-in-out infinite;border-radius:2px}
+@keyframes scan-line{0%,100%{top:25%;opacity:.5}50%{top:75%;opacity:1}}
+.vf-label{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.55);color:white;font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px;white-space:nowrap}
+#feedback{text-align:center;font-size:14px;font-weight:700;min-height:20px;color:var(--text-light)}
+#feedback.success{color:var(--green)}
+#feedback.error{color:var(--red)}
+#btn-scan{background:var(--green);color:white;border:none;border-radius:20px;padding:16px;font-family:'Nunito',sans-serif;font-size:21px;font-weight:900;cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 6px 0 var(--green-dark);transition:transform .1s,box-shadow .1s;-webkit-tap-highlight-color:transparent}
+#btn-scan:active{transform:translateY(4px);box-shadow:0 2px 0 var(--green-dark)}
+#btn-scan.scanning{background:var(--red);box-shadow:0 6px 0 var(--red-dark)}
+#actions-row{display:flex;gap:8px}
+.btn-secondary{flex:1;border:3px solid var(--green);background:white;color:var(--green);border-radius:14px;padding:11px 6px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:800;cursor:pointer;text-align:center;-webkit-tap-highlight-color:transparent}
+#btn-payer-open{border-color:#D97B10;color:#D97B10}
+#btn-ticket{flex:1.5;background:var(--yellow);border-color:var(--yellow-dark);color:var(--text);box-shadow:0 4px 0 var(--yellow-dark);transition:transform .1s,box-shadow .1s}
+#btn-ticket:active{transform:translateY(3px);box-shadow:0 1px 0 var(--yellow-dark)}
+#btn-vider{border-color:#E5E7EB;color:var(--text-light)}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:flex-end;justify-content:center}
+.modal-overlay.open{display:flex;animation:overlay-in .25s ease}
+@keyframes overlay-in{from{opacity:0}to{opacity:1}}
+.modal-sheet{background:white;border-radius:24px 24px 0 0;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;animation:modal-in .35s cubic-bezier(.34,1.2,.64,1);padding-bottom:env(safe-area-inset-bottom,16px)}
+@keyframes modal-in{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-close-btn{display:block;width:calc(100% - 48px);margin:10px 24px 16px;border:none;border-radius:14px;padding:14px;font-family:'Nunito',sans-serif;font-size:17px;font-weight:900;cursor:pointer}
+#ticket-content{padding:18px 22px 14px;font-family:'Space Mono',monospace}
+.ticket-store{font-family:'Nunito',sans-serif;font-size:21px;font-weight:900;color:var(--green);text-align:center}
+.ticket-sub,.ticket-date{font-size:11px;color:var(--text-light);text-align:center;margin-top:2px}
+.ticket-divider{border:none;border-top:2px dashed #D1D5DB;margin:10px 0}
+.ticket-ligne{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;gap:8px}
+.tl-nom{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tl-emoji{flex-shrink:0;font-size:14px}
+.tl-prix{flex-shrink:0;font-weight:700}
+.ticket-total-row{display:flex;justify-content:space-between;font-size:17px;font-weight:700;padding:8px 0 3px;border-top:3px solid var(--text);margin-top:4px}
+.ticket-articles{font-size:10px;color:var(--text-light);text-align:right}
+.ticket-merci{font-family:'Nunito',sans-serif;text-align:center;margin-top:14px;font-size:16px;font-weight:800;color:var(--green)}
+.ticket-barcode{text-align:center;margin-top:8px;font-size:22px;letter-spacing:2px}
+.ticket-barcode-num{font-size:9px;letter-spacing:4px;color:var(--text-light);text-align:center;margin-top:2px}
+#btn-fermer-ticket{background:var(--green);color:white;box-shadow:0 4px 0 var(--green-dark)}
+#payer-content{padding:16px 18px 4px}
+.payer-title{font-size:22px;font-weight:900;text-align:center;margin-bottom:4px}
+.payer-total-due{font-family:'Space Mono',monospace;font-size:34px;font-weight:700;color:var(--green);text-align:center;margin:4px 0 2px}
+.payer-label{font-size:12px;color:var(--text-light);font-weight:700;text-align:center;margin-bottom:12px}
+.wallet-title{font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:var(--text-light);margin-bottom:7px;margin-top:4px}
+.billets-row{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:10px}
+.billet-btn{border:none;cursor:pointer;border-radius:11px;padding:0;overflow:hidden;box-shadow:0 3px 8px rgba(0,0,0,.15);-webkit-tap-highlight-color:transparent;aspect-ratio:1.7/1;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;transition:transform .1s;position:relative}
+.billet-btn:active{transform:scale(.92)}
+.bb5{background:linear-gradient(135deg,#7EC8E3,#4A9BBF)}
+.bb10{background:linear-gradient(135deg,#FF8C94,#D9555E)}
+.bb20{background:linear-gradient(135deg,#5B9BD5,#2B6AB0)}
+.bb50{background:linear-gradient(135deg,#FFB347,#D97B10)}
+.bb100{background:linear-gradient(135deg,#6BCB77,#35A043)}
+.bb-emoji{position:absolute;top:4px;right:6px;font-size:20px;opacity:.9}
+.bb-val{font-family:'Space Mono',monospace;font-size:17px;font-weight:700;color:white;padding:5px 7px;line-height:1}
+.bb-label{font-size:9px;font-weight:800;color:rgba(255,255,255,.75);padding:0 7px 5px;text-transform:uppercase}
+.pieces-row{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;margin-bottom:10px}
+.piece-btn{border:none;cursor:pointer;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:inset 0 2px 4px rgba(255,255,255,.5),inset 0 -2px 4px rgba(0,0,0,.15),0 3px 8px rgba(0,0,0,.2);-webkit-tap-highlight-color:transparent;transition:transform .1s;position:relative}
+.piece-btn::before{content:'';position:absolute;inset:3px;border-radius:50%;border:1.5px solid rgba(255,255,255,.3)}
+.piece-btn:active{transform:scale(.87)}
+.pb1c{width:48px;height:48px;background:radial-gradient(circle at 35% 35%,#E8E8E8,#B0B0B0 60%,#808080)}
+.pb2c{width:52px;height:52px;background:radial-gradient(circle at 35% 35%,#F0F0F0,#C0C0C0 60%,#909090)}
+.pb5c{width:52px;height:52px;background:radial-gradient(circle at 35% 35%,#D4A84B,#B8860B 60%,#8B6508)}
+.pb10c{width:58px;height:58px;background:radial-gradient(circle at 35% 35%,#FFD700,#DAA520 60%,#B8860B)}
+.pb20c{width:58px;height:58px;background:radial-gradient(circle at 35% 35%,#FFE44D,#FFD700 50%,#B8860B)}
+.pb50c{width:64px;height:64px;background:radial-gradient(circle at 35% 35%,#FFD700,#DAA520 60%,#B8860B)}
+.pb1e{width:68px;height:68px;background:radial-gradient(circle at 35% 35%,#E8D070,#C8A020 40%,#7A5500)}
+.pb2e{width:74px;height:74px;background:radial-gradient(circle at 35% 35%,#F0E080,#D4AA30 40%,#8A6000)}
+.pv{font-family:'Space Mono',monospace;font-weight:700;color:rgba(30,20,0,.7);font-size:11px;position:relative;z-index:1}
+.pe{font-size:13px;margin-bottom:1px;position:relative;z-index:1}
+.rendu-box{background:#F0F9F4;border:2px solid #C3E6CB;border-radius:14px;padding:10px 14px;margin-bottom:8px;display:none}
+.rendu-box.show{display:block}
+.rendu-title{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;color:var(--green-dark);margin-bottom:6px}
+.rendu-montants{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.rendu-item{text-align:center}
+.rv{font-family:'Space Mono',monospace;font-size:15px;font-weight:700}
+.rl{font-size:9px;font-weight:800;color:var(--text-light);text-transform:uppercase;margin-top:1px}
+.rendu-item.green .rv{color:var(--green)}
+.rendu-item.orange .rv{color:#D97B10}
+#btn-payer-valider{background:var(--green);color:white;box-shadow:0 4px 0 var(--green-dark)}
+#btn-reset-argent{background:#FFF3CD;color:#856404;border:2px solid #FFEEBA;box-shadow:none;font-size:14px;padding:10px}
+#btn-payer-annuler{background:white;color:var(--text-light);border:2px solid #E5E7EB;box-shadow:none;margin-top:4px}
+#flash-produit{display:none;position:fixed;inset:0;z-index:200;align-items:center;justify-content:center;pointer-events:none}
+#flash-produit.show{display:flex;animation:flash-fade .8s ease forwards}
+@keyframes flash-fade{0%{opacity:0}20%{opacity:1}70%{opacity:1}100%{opacity:0}}
+#flash-inner{background:var(--green);color:white;border-radius:24px;padding:22px 30px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.3)}
+#flash-emoji{font-size:58px;line-height:1}
+#flash-nom{font-size:19px;font-weight:900;margin-top:6px}
+#flash-prix{font-family:'Space Mono',monospace;font-size:22px;font-weight:700;margin-top:4px;color:var(--yellow)}
+.confetti-piece{position:fixed;top:-20px;border-radius:3px;animation:fall linear forwards;pointer-events:none;z-index:300}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg);opacity:0}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="install-banner">
+    <span>📲 Installe l'appli !</span>
+    <button onclick="installPWA()">Installer</button>
+    <button class="close-btn" onclick="document.getElementById('install-banner').classList.remove('show')">✕</button>
+  </div>
+  <div id="header">
+    <h1><span>🛒</span> Mon Supermarché</h1>
+    <div id="total-header">0,00 €</div>
+  </div>
+  <div id="panier-container">
+    <div id="empty-state">
+      <div class="big-icon">🥕</div>
+      <p>Le panier est vide !</p>
+      <small>Scanne un produit pour commencer</small>
+    </div>
+  </div>
+  <div id="tapis"></div>
+  <div id="scan-zone">
+    <div id="video-wrapper">
+      <video id="video" autoplay playsinline muted></video>
+      <div id="viewfinder">
+        <div class="vf-corner tl"></div><div class="vf-corner tr"></div>
+        <div class="vf-corner bl"></div><div class="vf-corner br"></div>
+        <div class="vf-line"></div>
+        <div class="vf-label">📦 Place le code barre ici</div>
+      </div>
+    </div>
+    <div id="feedback">Appuie sur le bouton pour scanner !</div>
+    <button id="btn-scan" onclick="toggleScan()">
+      <span id="btn-scan-icon">📷</span>
+      <span id="btn-scan-label">Scanner un produit</span>
+    </button>
+    <div id="actions-row">
+      <button class="btn-secondary" id="btn-vider" onclick="viderPanier()">🗑️ Vider</button>
+      <button class="btn-secondary" id="btn-payer-open" onclick="ouvrirPayer()">💰 Payer</button>
+      <button class="btn-secondary" id="btn-ticket" onclick="ouvrirTicket()">🧾 Ticket</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-ticket-overlay" class="modal-overlay" onclick="fermerModal('modal-ticket-overlay',event)">
+  <div class="modal-sheet">
+    <div id="ticket-content"></div>
+    <button id="btn-fermer-ticket" class="modal-close-btn" onclick="fermerModal('modal-ticket-overlay');resetPanier()">✅ Nouvelle course !</button>
+  </div>
+</div>
+
+<div id="modal-payer-overlay" class="modal-overlay" onclick="fermerModal('modal-payer-overlay',event)">
+  <div class="modal-sheet">
+    <div id="payer-content">
+      <div class="payer-title">💰 Payer les courses</div>
+      <div class="payer-total-due" id="payer-total-due">0,00 €</div>
+      <div class="payer-label">À PAYER</div>
+      <div class="wallet-title">💵 Billets</div>
+      <div class="billets-row">
+        <button class="billet-btn bb5" onclick="ajouterArgent(5)"><div class="bb-emoji">🥕</div><div class="bb-val">5€</div><div class="bb-label">cinq euros</div></button>
+        <button class="billet-btn bb10" onclick="ajouterArgent(10)"><div class="bb-emoji">🍎</div><div class="bb-val">10€</div><div class="bb-label">dix euros</div></button>
+        <button class="billet-btn bb20" onclick="ajouterArgent(20)"><div class="bb-emoji">🍊</div><div class="bb-val">20€</div><div class="bb-label">vingt euros</div></button>
+        <button class="billet-btn bb50" onclick="ajouterArgent(50)"><div class="bb-emoji">🍌</div><div class="bb-val">50€</div><div class="bb-label">cinquante</div></button>
+        <button class="billet-btn bb100" onclick="ajouterArgent(100)"><div class="bb-emoji">🍓</div><div class="bb-val">100€</div><div class="bb-label">cent euros</div></button>
+      </div>
+      <div class="wallet-title">🪙 Pièces</div>
+      <div class="pieces-row">
+        <button class="piece-btn pb1c" onclick="ajouterArgent(0.01)"><div class="pe">🌟</div><div class="pv">1c</div></button>
+        <button class="piece-btn pb2c" onclick="ajouterArgent(0.02)"><div class="pe">✨</div><div class="pv">2c</div></button>
+        <button class="piece-btn pb5c" onclick="ajouterArgent(0.05)"><div class="pe">🌻</div><div class="pv">5c</div></button>
+        <button class="piece-btn pb10c" onclick="ajouterArgent(0.10)"><div class="pe">⭐</div><div class="pv">10c</div></button>
+        <button class="piece-btn pb20c" onclick="ajouterArgent(0.20)"><div class="pe">🌟</div><div class="pv">20c</div></button>
+        <button class="piece-btn pb50c" onclick="ajouterArgent(0.50)"><div class="pe">💫</div><div class="pv">50c</div></button>
+        <button class="piece-btn pb1e" onclick="ajouterArgent(1)"><div class="pe">🛒</div><div class="pv">1€</div></button>
+        <button class="piece-btn pb2e" onclick="ajouterArgent(2)"><div class="pe">⭐</div><div class="pv">2€</div></button>
+      </div>
+      <div class="rendu-box" id="rendu-box">
+        <div class="rendu-title">🧮 Calcul de la caisse</div>
+        <div class="rendu-montants">
+          <div class="rendu-item"><div class="rv" id="rv-donne">0,00 €</div><div class="rl">Donné</div></div>
+          <div class="rendu-item"><div class="rv">−</div></div>
+          <div class="rendu-item"><div class="rv" id="rv-total">0,00 €</div><div class="rl">Total</div></div>
+          <div class="rendu-item"><div class="rv">=</div></div>
+          <div class="rendu-item" id="rv-rendu-item"><div class="rv" id="rv-rendu">0,00 €</div><div class="rl" id="rv-rendu-label">Rendu</div></div>
+        </div>
+      </div>
+      <button id="btn-payer-valider" class="modal-close-btn" onclick="validerPaiement()" style="display:none">🎉 Valider !</button>
+      <button id="btn-reset-argent" class="modal-close-btn" onclick="resetArgent()" style="display:none">↩️ Recommencer</button>
+      <button id="btn-payer-annuler" class="modal-close-btn" onclick="fermerModal('modal-payer-overlay')">✖️ Annuler</button>
+    </div>
+  </div>
+</div>
+
+<div id="flash-produit">
+  <div id="flash-inner">
+    <div id="flash-emoji"></div>
+    <div id="flash-nom"></div>
+    <div id="flash-prix"></div>
+  </div>
+</div>
+
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+}
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();deferredPrompt=e;
+  document.getElementById('install-banner').classList.add('show');
+});
+function installPWA(){
+  if(!deferredPrompt)return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(()=>{deferredPrompt=null;document.getElementById('install-banner').classList.remove('show');});
+}
+
+const PRODUITS={
+  "2000000000015":{nom:"Pomme Golden",cat:"Fruits & Légumes",prix:0.35,emoji:"🍎"},
+  "2000000000022":{nom:"Banane",cat:"Fruits & Légumes",prix:0.25,emoji:"🍌"},
+  "2000000000039":{nom:"Tomate Grappe",cat:"Fruits & Légumes",prix:0.60,emoji:"🍅"},
+  "2000000000046":{nom:"Carotte",cat:"Fruits & Légumes",prix:0.20,emoji:"🥕"},
+  "2000000000053":{nom:"Raisin Rouge",cat:"Fruits & Légumes",prix:1.20,emoji:"🍇"},
+  "2000000000060":{nom:"Fraise (barquette)",cat:"Fruits & Légumes",prix:2.50,emoji:"🍓"},
+  "2000000000077":{nom:"Orange",cat:"Fruits & Légumes",prix:0.45,emoji:"🍊"},
+  "2000000000084":{nom:"Brocoli",cat:"Fruits & Légumes",prix:1.10,emoji:"🥦"},
+  "2000000000091":{nom:"Citron",cat:"Fruits & Légumes",prix:0.30,emoji:"🍋"},
+  "2000000000107":{nom:"Courgette",cat:"Fruits & Légumes",prix:0.75,emoji:"🥒"},
+  "2000000000114":{nom:"Lait Entier 1L",cat:"Produits laitiers",prix:1.05,emoji:"🥛"},
+  "2000000000121":{nom:"Yaourt Nature x4",cat:"Produits laitiers",prix:1.80,emoji:"🫙"},
+  "2000000000138":{nom:"Fromage Comté",cat:"Produits laitiers",prix:2.90,emoji:"🧀"},
+  "2000000000145":{nom:"Beurre Doux",cat:"Produits laitiers",prix:1.95,emoji:"🧈"},
+  "2000000000152":{nom:"Crème Fraîche",cat:"Produits laitiers",prix:0.99,emoji:"🍶"},
+  "2000000000169":{nom:"Œufs x6",cat:"Produits laitiers",prix:2.15,emoji:"🥚"},
+  "2000000000176":{nom:"Baguette",cat:"Boulangerie",prix:0.95,emoji:"🥖"},
+  "2000000000183":{nom:"Pain de Mie",cat:"Boulangerie",prix:1.50,emoji:"🍞"},
+  "2000000000190":{nom:"Croissant",cat:"Boulangerie",prix:1.10,emoji:"🥐"},
+  "2000000000206":{nom:"Pain au Chocolat",cat:"Boulangerie",prix:1.20,emoji:"🥐"},
+  "2000000000213":{nom:"Brioche",cat:"Boulangerie",prix:2.40,emoji:"🍰"},
+  "2000000000220":{nom:"Pâtes Spaghetti",cat:"Épicerie",prix:0.99,emoji:"🍝"},
+  "2000000000237":{nom:"Riz Long Grain",cat:"Épicerie",prix:1.45,emoji:"🍚"},
+  "2000000000244":{nom:"Thon en Boîte",cat:"Épicerie",prix:1.75,emoji:"🐟"},
+  "2000000000251":{nom:"Soupe Tomate",cat:"Épicerie",prix:0.89,emoji:"🥣"},
+  "2000000000268":{nom:"Chocolat Noir",cat:"Épicerie",prix:1.30,emoji:"🍫"},
+  "2000000000275":{nom:"Confiture Fraise",cat:"Épicerie",prix:2.10,emoji:"🍓"},
+  "2000000000282":{nom:"Miel Fleurs",cat:"Épicerie",prix:3.50,emoji:"🍯"},
+  "2000000000299":{nom:"Céréales Choco",cat:"Épicerie",prix:2.80,emoji:"🥣"},
+  "2000000000305":{nom:"Huile d'Olive",cat:"Épicerie",prix:4.20,emoji:"🫒"},
+  "2000000000312":{nom:"Eau Plate 1,5L",cat:"Boissons",prix:0.45,emoji:"💧"},
+  "2000000000329":{nom:"Jus d'Orange",cat:"Boissons",prix:1.90,emoji:"🍊"},
+  "2000000000336":{nom:"Limonade",cat:"Boissons",prix:1.20,emoji:"🥤"},
+  "2000000000343":{nom:"Coca-Cola 33cl",cat:"Boissons",prix:0.99,emoji:"🥤"},
+  "2000000000350":{nom:"Smoothie Fruits",cat:"Boissons",prix:2.60,emoji:"🍹"},
+  "2000000000367":{nom:"Chocolat Chaud",cat:"Boissons",prix:1.80,emoji:"☕"},
+  "2000000000374":{nom:"Poulet Rôti",cat:"Viandes",prix:7.50,emoji:"🍗"},
+  "2000000000381":{nom:"Saucisses x6",cat:"Viandes",prix:2.95,emoji:"🌭"},
+  "2000000000398":{nom:"Jambon Blanc",cat:"Viandes",prix:2.40,emoji:"🥩"},
+  "2000000000404":{nom:"Filet de Saumon",cat:"Poissons",prix:5.90,emoji:"🐠"},
+  "2000000000411":{nom:"Crevettes",cat:"Poissons",prix:4.50,emoji:"🦐"},
+  "2000000000428":{nom:"Bonbons Ourson",cat:"Sucreries",prix:1.10,emoji:"🐻"},
+  "2000000000435":{nom:"Crêpes Sucrées",cat:"Sucreries",prix:1.90,emoji:"🫓"},
+  "2000000000442":{nom:"Glace Vanille",cat:"Sucreries",prix:3.20,emoji:"🍦"},
+  "2000000000459":{nom:"Gâteau Chocolat",cat:"Sucreries",prix:4.50,emoji:"🎂"},
+  "2000000000466":{nom:"Shampooing",cat:"Hygiène",prix:2.80,emoji:"🧴"},
+  "2000000000473":{nom:"Savon",cat:"Hygiène",prix:0.90,emoji:"🧼"},
+  "2000000000480":{nom:"Dentifrice",cat:"Hygiène",prix:1.60,emoji:"🦷"},
+  "2000000000497":{nom:"Papier Toilette x6",cat:"Maison",prix:3.40,emoji:"🧻"},
+  "2000000000503":{nom:"Lessive",cat:"Maison",prix:5.20,emoji:"🫧"}
+};
+
+let panier=[],total=0,scanning=false,scannerStream=null,barcodeDetector=null,animationId=null,audioCtx=null,argentDonne=0;
+
+async function toggleScan(){scanning?arreterScan():await demarrerScan();}
+
+async function demarrerScan(){
+  if(!audioCtx){try{audioCtx=new(window.AudioContext||window.webkitAudioContext)();}catch(e){}}
+  const fb=document.getElementById('feedback');
+  if(!('BarcodeDetector' in window)){
+    const c=prompt("📦 Entre le numéro du code barre :");
+    if(c&&c.trim())traiterCode(c.trim());return;
+  }
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280}}});
+    scannerStream=stream;
+    const v=document.getElementById('video');v.srcObject=stream;await v.play();
+    barcodeDetector=new BarcodeDetector({formats:['ean_13','ean_8','code_128','upc_a','upc_e','code_39']});
+    scanning=true;
+    document.getElementById('video-wrapper').classList.add('active');
+    document.getElementById('btn-scan').classList.add('scanning');
+    document.getElementById('btn-scan-icon').textContent='⏹️';
+    document.getElementById('btn-scan-label').textContent='Arrêter le scan';
+    fb.className='';fb.textContent='📷 Approche le code barre…';
+    detectLoop();
+  }catch(e){
+    fb.className='error';fb.textContent='❌ Caméra indispo — saisis le code manuellement';
+    setTimeout(()=>{const c=prompt("📦 Numéro du code barre :");if(c&&c.trim())traiterCode(c.trim());},400);
+  }
+}
+
+function arreterScan(){
+  scanning=false;if(animationId)cancelAnimationFrame(animationId);
+  if(scannerStream){scannerStream.getTracks().forEach(t=>t.stop());scannerStream=null;}
+  document.getElementById('video').srcObject=null;
+  document.getElementById('video-wrapper').classList.remove('active');
+  document.getElementById('btn-scan').classList.remove('scanning');
+  document.getElementById('btn-scan-icon').textContent='📷';
+  document.getElementById('btn-scan-label').textContent='Scanner un produit';
+}
+
+async function detectLoop(){
+  if(!scanning)return;
+  const v=document.getElementById('video');
+  if(v.readyState>=2){try{const c=await barcodeDetector.detect(v);if(c.length>0){traiterCode(c[0].rawValue);arreterScan();return;}}catch(e){}}
+  animationId=requestAnimationFrame(detectLoop);
+}
+
+function traiterCode(code){
+  const fb=document.getElementById('feedback'),p=PRODUITS[code];
+  if(p){ajouterAuPanier(p,code);fb.className='success';fb.textContent='✅ '+p.emoji+' '+p.nom+' ajouté !';showFlash(p);jouerBeep(true);setTimeout(()=>{fb.className='';fb.textContent='Appuie sur le bouton pour scanner !';},2500);}
+  else{fb.className='error';fb.textContent='❌ Code "'+code+'" inconnu';jouerBeep(false);setTimeout(()=>{fb.className='';fb.textContent='Appuie sur le bouton pour scanner !';},2000);}
+}
+
+function ajouterAuPanier(p,code){
+  panier.push(Object.assign({},p,{code:code,id:Date.now()+Math.random()}));
+  total=Math.round(panier.reduce(function(s,x){return s+x.prix;},0)*100)/100;
+  updateDisplay();
+  setTimeout(function(){var c=document.getElementById('panier-container');c.scrollTop=c.scrollHeight;},50);
+}
+function retirerDuPanier(id){panier=panier.filter(function(p){return p.id!==id;});total=Math.round(panier.reduce(function(s,p){return s+p.prix;},0)*100)/100;updateDisplay();}
+function viderPanier(){if(!panier.length)return;if(!confirm('🗑️ Vider tout le panier ?'))return;panier=[];total=0;updateDisplay();}
+function resetPanier(){panier=[];total=0;updateDisplay();}
+function formatPrix(v){return v.toFixed(2).replace('.',',')+' €';}
+
+function updateDisplay(){
+  var c=document.getElementById('panier-container'),th=document.getElementById('total-header');
+  th.textContent=formatPrix(total);th.classList.add('bump');setTimeout(function(){th.classList.remove('bump');},200);
+  if(!panier.length){c.innerHTML='<div id="empty-state"><div class="big-icon">🥕</div><p>Le panier est vide !</p><small>Scanne un produit pour commencer</small></div>';return;}
+  c.innerHTML=panier.map(function(p,i){
+    return '<div class="produit-card '+(i===panier.length-1?'nouveau':'')+'">'+
+      '<div class="produit-emoji">'+p.emoji+'</div>'+
+      '<div class="produit-info"><div class="produit-nom">'+p.nom+'</div><div class="produit-cat">'+p.cat+'</div></div>'+
+      '<div class="produit-prix">'+formatPrix(p.prix)+'</div>'+
+      '<button class="btn-retirer" onclick="retirerDuPanier('+p.id+')">❌</button></div>';
+  }).join('');
+}
+
+function ouvrirPayer(){
+  if(!panier.length){alert('🛒 Le panier est vide !');return;}
+  argentDonne=0;
+  document.getElementById('payer-total-due').textContent=formatPrix(total);
+  document.getElementById('rv-total').textContent=formatPrix(total);
+  document.getElementById('rendu-box').classList.remove('show');
+  document.getElementById('btn-payer-valider').style.display='none';
+  document.getElementById('btn-reset-argent').style.display='none';
+  document.getElementById('modal-payer-overlay').classList.add('open');
+}
+
+function ajouterArgent(m){
+  argentDonne=Math.round((argentDonne+m)*100)/100;
+  var rendu=Math.round((argentDonne-total)*100)/100;
+  document.getElementById('rendu-box').classList.add('show');
+  document.getElementById('rv-donne').textContent=formatPrix(argentDonne);
+  document.getElementById('btn-reset-argent').style.display='block';
+  var rEl=document.getElementById('rv-rendu'),rLbl=document.getElementById('rv-rendu-label'),rItem=document.getElementById('rv-rendu-item'),vBtn=document.getElementById('btn-payer-valider');
+  if(rendu<0){rEl.textContent=formatPrix(Math.abs(rendu));rLbl.textContent='Manque encore';rItem.className='rendu-item orange';vBtn.style.display='none';}
+  else{rEl.textContent=formatPrix(rendu);rLbl.textContent=rendu===0?'Compte pile !':'Monnaie à rendre';rItem.className='rendu-item green';vBtn.style.display='block';vBtn.textContent=rendu===0?'🎉 Compte pile ! Valider':'💸 Rendre '+formatPrix(rendu)+' — Valider';jouerBeep(true);}
+}
+
+function resetArgent(){argentDonne=0;document.getElementById('rendu-box').classList.remove('show');document.getElementById('btn-payer-valider').style.display='none';document.getElementById('btn-reset-argent').style.display='none';}
+
+function validerPaiement(){fermerModal('modal-payer-overlay');setTimeout(function(){lancerConfettis();jouerBeep(true);setTimeout(function(){ouvrirTicket(true);},600);},200);}
+
+function lancerConfettis(){
+  var cols=['#FFD23F','#2D8A4E','#E83B2A','#5B9BD5','#FFB347','#FF8C94','#6BCB77'];
+  for(var i=0;i<50;i++){
+    var el=document.createElement('div');el.className='confetti-piece';
+    var s=Math.random()*10+6;
+    el.style.cssText='width:'+s+'px;height:'+s+'px;background:'+cols[Math.floor(Math.random()*cols.length)]+';left:'+Math.random()*100+'vw;animation-duration:'+(Math.random()*1.5+1)+'s;animation-delay:'+(Math.random()*.5)+'s;transform:rotate('+(Math.random()*360)+'deg);border-radius:'+(Math.random()>.5?'50%':'2px')+';';
+    document.body.appendChild(el);setTimeout(function(){el.remove();},3000);
+  }
+}
+
+function ouvrirTicket(apres){
+  apres=apres||false;
+  if(!panier.length&&!apres){alert('🛒 Le panier est vide !');return;}
+  var now=new Date();
+  var ds=now.toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  var ts=now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  var num=Math.floor(Math.random()*9000+1000);
+  var renduStr='';
+  if(apres&&(argentDonne-total)>0.001){renduStr='<div class="ticket-ligne"><span class="tl-emoji">💸</span><span class="tl-nom"> Monnaie rendue</span><span class="tl-prix">−'+formatPrix(Math.round((argentDonne-total)*100)/100)+'</span></div>';}
+  var lignes=panier.map(function(p){return '<div class="ticket-ligne"><span class="tl-emoji">'+p.emoji+'</span><span class="tl-nom"> '+p.nom+'</span><span class="tl-prix">'+formatPrix(p.prix)+'</span></div>';}).join('');
+  var payeStr=apres?'<div class="ticket-ligne" style="margin-top:4px"><span class="tl-emoji">💰</span><span class="tl-nom"> Payé</span><span class="tl-prix">'+formatPrix(argentDonne)+'</span></div>'+renduStr:'';
+  document.getElementById('ticket-content').innerHTML=
+    '<div style="margin-bottom:14px"><div class="ticket-store">🛒 Mon Supermarché</div>'+
+    '<div class="ticket-sub">La boutique des petits explorateurs</div>'+
+    '<div class="ticket-date">Le '+ds+' à '+ts+'</div>'+
+    '<div class="ticket-date">Ticket n° '+num+' — Caisse 1</div></div>'+
+    '<hr class="ticket-divider">'+lignes+
+    '<hr class="ticket-divider">'+
+    '<div class="ticket-total-row"><span>TOTAL</span><span>'+formatPrix(total)+'</span></div>'+
+    payeStr+
+    '<div class="ticket-articles">'+panier.length+' article'+(panier.length>1?'s':'')+'</div>'+
+    '<hr class="ticket-divider">'+
+    '<div class="ticket-merci">'+(apres?'Merci, à bientôt ! 🎉':'Merci et à bientôt ! 👋')+'</div>'+
+    '<div class="ticket-barcode">||| || | ||| | || |||</div>'+
+    '<div class="ticket-barcode-num">'+num+Math.floor(Math.random()*90000+10000)+'</div>';
+  document.getElementById('modal-ticket-overlay').classList.add('open');
+}
+
+function fermerModal(id,e){if(e&&e.target!==document.getElementById(id))return;document.getElementById(id).classList.remove('open');}
+
+function showFlash(p){document.getElementById('flash-emoji').textContent=p.emoji;document.getElementById('flash-nom').textContent=p.nom;document.getElementById('flash-prix').textContent=formatPrix(p.prix);var el=document.getElementById('flash-produit');el.className='show';setTimeout(function(){el.className='';},850);}
+
+function jouerBeep(s){
+  try{
+    if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    var o=audioCtx.createOscillator(),g=audioCtx.createGain();
+    o.connect(g);g.connect(audioCtx.destination);o.type='square';
+    if(s){o.frequency.setValueAtTime(880,audioCtx.currentTime);o.frequency.setValueAtTime(1100,audioCtx.currentTime+.07);}
+    else{o.frequency.setValueAtTime(220,audioCtx.currentTime);}
+    g.gain.setValueAtTime(.3,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+.2);
+    o.start();o.stop(audioCtx.currentTime+.2);
+  }catch(e){}
+}
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){fermerModal('modal-ticket-overlay');fermerModal('modal-payer-overlay');}});
+</script>
+</body>
+</html>
